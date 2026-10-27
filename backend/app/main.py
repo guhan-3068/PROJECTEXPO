@@ -44,6 +44,59 @@ def _run_db_migrations(db_engine):
                     conn.execute(text("ALTER TABLE verification_results ADD COLUMN action_plan TEXT DEFAULT '[]'"))
                 if "confidence_summary" not in ver_cols:
                     conn.execute(text("ALTER TABLE verification_results ADD COLUMN confidence_summary TEXT DEFAULT '{}'"))
+                if "readiness_breakdown" not in ver_cols:
+                    conn.execute(text("ALTER TABLE verification_results ADD COLUMN readiness_breakdown TEXT DEFAULT '{}'"))
+
+            if inspector.has_table("checklist_requirements"):
+                chk_cols = [c["name"] for c in inspector.get_columns("checklist_requirements")]
+                if "alternative_documents" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN alternative_documents TEXT DEFAULT '[]'"))
+                if "eligibility_conditions" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN eligibility_conditions TEXT"))
+                if "validity_rules" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN validity_rules TEXT"))
+                if "accepted_formats" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN accepted_formats VARCHAR(128) DEFAULT 'PDF, JPG, JPEG, PNG (Max 15MB)'"))
+                if "official_source_url" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN official_source_url VARCHAR(512)"))
+                if "last_verified_date" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN last_verified_date DATETIME"))
+                if "next_review_date" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN next_review_date DATETIME"))
+                if "status" not in chk_cols:
+                    conn.execute(text("ALTER TABLE checklist_requirements ADD COLUMN status VARCHAR(32) DEFAULT 'Current'"))
+
+            if inspector.has_table("application_profiles"):
+                prof_cols = [c["name"] for c in inspector.get_columns("application_profiles")]
+                if "official_source_url" not in prof_cols:
+                    conn.execute(text("ALTER TABLE application_profiles ADD COLUMN official_source_url VARCHAR(512)"))
+                if "last_verified_date" not in prof_cols:
+                    conn.execute(text("ALTER TABLE application_profiles ADD COLUMN last_verified_date DATETIME"))
+                if "next_review_date" not in prof_cols:
+                    conn.execute(text("ALTER TABLE application_profiles ADD COLUMN next_review_date DATETIME"))
+                if "status" not in prof_cols:
+                    conn.execute(text("ALTER TABLE application_profiles ADD COLUMN status VARCHAR(32) DEFAULT 'Current'"))
+                if "eligibility_criteria" not in prof_cols:
+                    conn.execute(text("ALTER TABLE application_profiles ADD COLUMN eligibility_criteria TEXT"))
+
+            if inspector.has_table("uploaded_documents"):
+                doc_cols = [c["name"] for c in inspector.get_columns("uploaded_documents")]
+                if "checklist_requirement_id" not in doc_cols:
+                    conn.execute(text("ALTER TABLE uploaded_documents ADD COLUMN checklist_requirement_id VARCHAR(36)"))
+
+            if inspector.has_table("tampering_analyses"):
+                tamp_cols = [c["name"] for c in inspector.get_columns("tampering_analyses")]
+                if "authenticity_result" not in tamp_cols:
+                    conn.execute(text("ALTER TABLE tampering_analyses ADD COLUMN authenticity_result VARCHAR(64) DEFAULT 'No obvious manipulation detected'"))
+                if "ai_generation_screening" not in tamp_cols:
+                    conn.execute(text("ALTER TABLE tampering_analyses ADD COLUMN ai_generation_screening VARCHAR(64) DEFAULT 'No synthetic generative signatures identified'"))
+                if "digital_signature_status" not in tamp_cols:
+                    conn.execute(text("ALTER TABLE tampering_analyses ADD COLUMN digital_signature_status VARCHAR(64) DEFAULT 'No digital signature (Standard scan/copy)'"))
+                if "visual_structure_evidence" not in tamp_cols:
+                    conn.execute(text("ALTER TABLE tampering_analyses ADD COLUMN visual_structure_evidence TEXT DEFAULT '[]'"))
+                if "metadata_evidence" not in tamp_cols:
+                    conn.execute(text("ALTER TABLE tampering_analyses ADD COLUMN metadata_evidence TEXT DEFAULT '[]'"))
+
             conn.commit()
     except Exception as e:
         print(f"[DB Migration Info] {e}")
@@ -69,11 +122,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware
+# CORS Middleware (permits configured origins + all Vercel deployment preview/production domains)
 origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -13,6 +13,7 @@ from app.services.expiry_detector import expiry_detector
 from app.services.mismatch_detector import mismatch_detector
 from app.services.report_generator import report_generator
 from app.services.confidence_meter_service import confidence_meter_service
+from app.services.document_verifier import document_verifier
 
 router = APIRouter(prefix="/verify", tags=["Verification"])
 
@@ -33,6 +34,8 @@ def _format_verification_out(res: VerificationResult) -> dict:
         "prioritized_checklist": res.get_json_field("prioritized_checklist"),
         "action_plan": res.get_json_field("action_plan"),
         "confidence_summary": res.get_json_field("confidence_summary"),
+        "readiness_breakdown": res.get_json_field("readiness_breakdown"),
+        "document_evaluations": res.get_json_field("document_evaluations"),
         "report_pdf_url": f"/api/v1/reports/{res.user_application_id}/download" if res.report_pdf_path else None,
         "evaluated_at": res.evaluated_at
     }
@@ -315,7 +318,61 @@ def run_verification(
         mismatches=mismatches
     )
 
-    # 7. Generate Verification Audit PDF Report
+    # 7. Compute Individual Document Evaluations & Application Readiness Breakdown
+    required_count = len([r for r in profile.requirements if r.is_mandatory])
+    uploaded_count = len(docs)
+    passing_count = 0
+    needs_review_count = 0
+    doc_evaluations = {}
+    doc_summaries_for_report = []
+
+    for d in docs:
+        req_mapped = d.checklist_requirement
+        ev = document_verifier.evaluate_document(d, req_mapped, profile.code)
+        doc_evaluations[d.id] = ev
+
+        auth_s = ev["dimensions"]["authenticity_screening"]["status"]
+        val_s = ev["dimensions"]["validity_expiry"]["status"]
+        qual_s = ev["dimensions"]["readability_quality"]["status"]
+        off_s = ev["dimensions"]["official_readiness"]["status"]
+
+        if auth_s == "FAIL" or val_s == "EXPIRED" or qual_s == "FAIL" or off_s == "NEEDS_REVIEW":
+            needs_review_count += 1
+        else:
+            passing_count += 1
+
+        # Summary for PDF
+        masked_txt = ", ".join([f"{k}: {v}" for k, v in ev["dimensions"]["fields_extraction"]["masked_fields"].items()])
+        doc_summaries_for_report.append({
+            "filename": d.original_filename,
+            "category": d.doc_category or "UNKNOWN",
+            "confidence": int((d.ocr_overall_confidence or 0.0) * 100),
+            "extracted_text": masked_txt or "No structured fields extracted"
+        })
+
+    missing_count = len([m for m in req_analysis["missing"] if m.get("is_mandatory", True)])
+
+    if uploaded_count == 0 or missing_count > 0:
+        readiness_status_official = "Documents Missing"
+    elif any(d.ocr_status == "PROCESSING" for d in docs):
+        readiness_status_official = "Verification In Progress"
+    elif needs_review_count > 0 or len(tampering_flags) > 0 or len(expired_list) > 0:
+        readiness_status_official = "Action Required"
+    else:
+        readiness_status_official = "Ready for Submission Review"
+
+    readiness_breakdown = {
+        "required_count": required_count,
+        "uploaded_count": uploaded_count,
+        "passing_count": passing_count,
+        "needs_review_count": needs_review_count,
+        "missing_count": missing_count,
+        "readiness_status": readiness_status_official,
+        "progress_percentage": int(round((min(uploaded_count, required_count) / max(required_count, 1)) * 100)),
+        "progress_text": f"{min(uploaded_count, required_count)} of {required_count} required documents uploaded and checked"
+    }
+
+    # 8. Generate Verification Audit PDF Report
     applicant_name = app.user.full_name if app.user else "Applicant"
     pdf_path = report_generator.generate_pdf_report(
         application_ref=app.reference_number,
@@ -330,17 +387,18 @@ def run_verification(
         mismatches=mismatches,
         tampering_flags=tampering_flags,
         recommended_actions=actions,
+        uploaded_documents_summary=doc_summaries_for_report,
         confidence_data=confidence_data
     )
 
-    # 8. Update or Create VerificationResult record
+    # 9. Update or Create VerificationResult record
     ver_res = db.query(VerificationResult).filter(VerificationResult.user_application_id == application_id).first()
     if not ver_res:
         ver_res = VerificationResult(user_application_id=application_id)
         db.add(ver_res)
 
     ver_res.overall_status = overall_status
-    ver_res.readiness_status = readiness_status
+    ver_res.readiness_status = readiness_status_official
     ver_res.readiness_score = readiness_score
     ver_res.set_json_field("satisfied_requirements", req_analysis["satisfied"])
     ver_res.set_json_field("missing_requirements", req_analysis["missing"])
@@ -352,11 +410,13 @@ def run_verification(
     ver_res.set_json_field("prioritized_checklist", prioritized_checklist)
     ver_res.set_json_field("action_plan", action_plan)
     ver_res.set_json_field("confidence_summary", confidence_data)
+    ver_res.set_json_field("readiness_breakdown", readiness_breakdown)
+    ver_res.set_json_field("document_evaluations", doc_evaluations)
     ver_res.report_pdf_path = pdf_path
 
     # Update application status
     app.status = overall_status
-    app.readiness_status = readiness_status
+    app.readiness_status = readiness_status_official
     db.commit()
     db.refresh(ver_res)
 

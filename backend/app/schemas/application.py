@@ -13,9 +13,15 @@ class ChecklistRequirementBase(BaseModel):
     min_validity_days: int = 0
     allow_manual_override: bool = True
     sort_order: int = 0
+    alternative_documents: List[str] = []
+    eligibility_conditions: Optional[str] = None
+    validity_rules: Optional[str] = None
+    accepted_formats: Optional[str] = "PDF, JPG, JPEG, PNG (Max 15MB)"
+    official_source_url: Optional[str] = None
+    status: Optional[str] = "Current"
 
-    @field_validator("accepted_categories", mode="before")
-    def parse_accepted_categories(cls, v):
+    @field_validator("accepted_categories", "alternative_documents", mode="before")
+    def parse_json_lists(cls, v):
         if isinstance(v, str):
             try:
                 return json.loads(v)
@@ -26,9 +32,31 @@ class ChecklistRequirementBase(BaseModel):
 class ChecklistRequirementOut(ChecklistRequirementBase):
     id: str
     application_profile_id: str
+    last_verified_date: Optional[datetime] = None
+    next_review_date: Optional[datetime] = None
+    is_review_needed: bool = False
 
     class Config:
         from_attributes = True
+
+class ChecklistRequirementCreate(ChecklistRequirementBase):
+    application_profile_id: str
+    last_verified_date: Optional[datetime] = None
+    next_review_date: Optional[datetime] = None
+
+class ChecklistRequirementUpdate(BaseModel):
+    display_name: Optional[str] = None
+    description: Optional[str] = None
+    is_mandatory: Optional[bool] = None
+    requirement_type: Optional[str] = None
+    accepted_categories: Optional[List[str]] = None
+    alternative_documents: Optional[List[str]] = None
+    eligibility_conditions: Optional[str] = None
+    validity_rules: Optional[str] = None
+    accepted_formats: Optional[str] = None
+    official_source_url: Optional[str] = None
+    status: Optional[str] = None
+    sort_order: Optional[int] = None
 
 class ApplicationProfileBase(BaseModel):
     code: str
@@ -37,9 +65,14 @@ class ApplicationProfileBase(BaseModel):
     category: str
     description: Optional[str] = None
     is_active: bool = True
+    official_source_url: Optional[str] = None
+    status: Optional[str] = "Current"
+    eligibility_criteria: Optional[str] = None
 
 class ApplicationProfileOut(ApplicationProfileBase):
     id: str
+    last_verified_date: Optional[datetime] = None
+    next_review_date: Optional[datetime] = None
     requirements: List[ChecklistRequirementOut] = []
 
     class Config:

@@ -24,9 +24,14 @@ class FieldCorrectionRequest(BaseModel):
 class TamperingSummaryOut(BaseModel):
     is_flagged: bool
     risk_level: str
+    authenticity_result: str = "No obvious manipulation detected"
+    ai_generation_screening: str = "No synthetic generative signatures identified"
+    digital_signature_status: str = "No digital signature (Standard scan/copy)"
     ela_anomaly_score: float
     metadata_software_detected: Optional[str] = None
     detected_anomalies: List[str] = []
+    visual_structure_evidence: List[str] = []
+    metadata_evidence: List[str] = []
     explanation: Optional[str] = None
 
     class Config:
@@ -35,6 +40,7 @@ class TamperingSummaryOut(BaseModel):
 class DocumentOut(BaseModel):
     id: str
     user_application_id: str
+    checklist_requirement_id: Optional[str] = None
     original_filename: str
     file_size_bytes: int
     mime_type: str
@@ -45,6 +51,7 @@ class DocumentOut(BaseModel):
     created_at: datetime
     extracted_fields: List[ExtractedFieldOut] = []
     tampering_analysis: Optional[TamperingSummaryOut] = None
+    individual_verification: Optional[dict] = None
 
     class Config:
         from_attributes = True

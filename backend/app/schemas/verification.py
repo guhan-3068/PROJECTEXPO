@@ -80,6 +80,8 @@ class VerificationResultOut(BaseModel):
     prioritized_checklist: List[PrioritizedChecklistItem] = []
     action_plan: List[ActionPlanItem] = []
     confidence_summary: Optional[Dict[str, Any]] = None
+    readiness_breakdown: Optional[Dict[str, Any]] = None
+    document_evaluations: Optional[Dict[str, Any]] = None
     report_pdf_url: Optional[str] = None
     evaluated_at: datetime
 

@@ -111,6 +111,10 @@ export const applicationsApi = {
     const res = await apiClient.get(`/applications/correction-guides/${guideId}`);
     return res.data;
   },
+  getApplicationSlots: async (applicationId) => {
+    const res = await apiClient.get(`/applications/${applicationId}/slots`);
+    return res.data;
+  },
 };
 
 export const documentsApi = {
@@ -127,6 +131,23 @@ export const documentsApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return res.data;
+  },
+  uploadSlotDocument: async (applicationId, requirementId, file, claimedCategory = null) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (claimedCategory) {
+      formData.append('claimed_category', claimedCategory);
+    }
+    const res = await apiClient.post(`/documents/upload-slot/${applicationId}/${requirementId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  },
+  getDocumentAudit: async (documentId) => {
+    const res = await apiClient.get(`/documents/${documentId}/audit`);
     return res.data;
   },
   getApplicationDocuments: async (applicationId) => {
@@ -223,6 +244,30 @@ export const adminApi = {
   },
   createProfile: async (profilePayload) => {
     const res = await apiClient.post('/admin/profiles', profilePayload);
+    return res.data;
+  },
+  getRequirements: async (filters = {}) => {
+    const res = await apiClient.get('/admin/requirements', { params: filters });
+    return res.data;
+  },
+  createRequirement: async (payload) => {
+    const res = await apiClient.post('/admin/requirements', payload);
+    return res.data;
+  },
+  updateRequirement: async (requirementId, payload) => {
+    const res = await apiClient.put(`/admin/requirements/${requirementId}`, payload);
+    return res.data;
+  },
+  deleteRequirement: async (requirementId) => {
+    const res = await apiClient.delete(`/admin/requirements/${requirementId}`);
+    return res.data;
+  },
+  verifyRequirement: async (requirementId) => {
+    const res = await apiClient.post(`/admin/requirements/${requirementId}/verify`);
+    return res.data;
+  },
+  syncDefaultRequirements: async () => {
+    const res = await apiClient.post('/admin/requirements/sync-defaults');
     return res.data;
   },
 };

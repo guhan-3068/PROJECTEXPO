@@ -56,3 +56,66 @@ def encrypt_bytes(data: bytes) -> bytes:
 def decrypt_bytes(encrypted_data: bytes) -> bytes:
     """Decrypts ciphertext back to original binary."""
     return fernet_cipher.decrypt(encrypted_data)
+
+
+# Privacy & Data Minimization Masking Helpers
+def mask_aadhaar_number(val: str) -> str:
+    """Masks 12-digit Aadhaar number as XXXX-XXXX-1234."""
+    if not val:
+        return "XXXX-XXXX-XXXX"
+    clean = "".join(filter(str.isdigit, str(val)))
+    if len(clean) >= 4:
+        return f"XXXX-XXXX-{clean[-4:]}"
+    return "XXXX-XXXX-XXXX"
+
+
+def mask_pan_number(val: str) -> str:
+    """Masks 10-character PAN number preserving first 2 and last 2 characters (e.g., AB***4F)."""
+    if not val:
+        return "XX***XX"
+    s = str(val).strip().upper()
+    if len(s) >= 4:
+        return f"{s[:2]}***{s[-2:]}"
+    return "XX***XX"
+
+
+def mask_sensitive_value(field_key: str, val: Any) -> str:
+    """
+    Intelligently masks sensitive personal data according to Indian privacy guidelines.
+    """
+    if val is None:
+        return "N/A"
+    s = str(val).strip()
+    if not s:
+        return ""
+
+    fk = field_key.lower()
+
+    if "aadhaar" in fk or "uid" in fk:
+        return mask_aadhaar_number(s)
+    elif "pan" in fk:
+        return mask_pan_number(s)
+    elif "account" in fk or "bank" in fk:
+        digits = "".join(filter(str.isdigit, s))
+        if len(digits) >= 4:
+            return f"XXXX-XXXX-{digits[-4:]}"
+        return "XXXX-XXXX-XXXX"
+    elif "phone" in fk or "mobile" in fk:
+        digits = "".join(filter(str.isdigit, s))
+        if len(digits) >= 4:
+            return f"XXXXXX{digits[-4:]}"
+        return "XXXXXXXXXX"
+    elif "ration" in fk or "smart_card" in fk:
+        if len(s) >= 4:
+            return f"XX/X/{s[-4:]}"
+        return "XX/X/XXXX"
+    elif "passport" in fk:
+        if len(s) >= 3:
+            return f"{s[0]}*****{s[-2:]}"
+        return "X*****XX"
+    elif "license" in fk or "dl" in fk:
+        if len(s) >= 4:
+            return f"DL-**-***{s[-4:]}"
+        return "DL-**-*****"
+
+    return s

@@ -10,6 +10,7 @@ class UploadedDocument(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_application_id = Column(String(36), ForeignKey("user_applications.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    checklist_requirement_id = Column(String(36), ForeignKey("checklist_requirements.id", ondelete="SET NULL"), nullable=True)
     
     original_filename = Column(String(255), nullable=False)
     stored_filename = Column(String(255), unique=True, nullable=False)

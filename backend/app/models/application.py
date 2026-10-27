@@ -15,6 +15,11 @@ class ApplicationProfile(Base):
     category = Column(String(128), nullable=False)      # e.g., Identity, Travel, Employment, Education
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    official_source_url = Column(String(512), nullable=True)
+    last_verified_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    next_review_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    status = Column(String(32), default="Current", nullable=True)  # Current, Review Needed, Outdated
+    eligibility_criteria = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
@@ -36,6 +41,16 @@ class ChecklistRequirement(Base):
     allow_manual_override = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
 
+    # Dynamic Requirement Management Fields (Indian Citizen Portal)
+    alternative_documents = Column(Text, nullable=False, default="[]")  # JSON-serialized list of alternative doc names
+    eligibility_conditions = Column(Text, nullable=True)                 # e.g., "Family income < 2.5 LPA; First graduate in family"
+    validity_rules = Column(Text, nullable=True)                         # e.g., "Valid for 1 financial year; annual renewal required"
+    accepted_formats = Column(String(128), default="PDF, JPG, JPEG, PNG (Max 15MB)", nullable=True)
+    official_source_url = Column(String(512), nullable=True)             # e.g., "https://www.tnesevai.tn.gov.in"
+    last_verified_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    next_review_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
+    status = Column(String(32), default="Current", nullable=True)       # Current, Review Needed, Outdated
+
     profile = relationship("ApplicationProfile", back_populates="requirements")
 
     def get_accepted_categories(self):
@@ -46,6 +61,15 @@ class ChecklistRequirement(Base):
 
     def set_accepted_categories(self, categories):
         self.accepted_categories = json.dumps(categories)
+
+    def get_alternative_documents(self):
+        try:
+            return json.loads(self.alternative_documents) if self.alternative_documents else []
+        except Exception:
+            return []
+
+    def set_alternative_documents(self, alts):
+        self.alternative_documents = json.dumps(alts)
 
 class UserApplication(Base):
     __tablename__ = "user_applications"
